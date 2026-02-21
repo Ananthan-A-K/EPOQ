@@ -64,6 +64,7 @@ export default function Home() {
   const [onlyZip, setOnlyZip] = useState(false);
   const [gpuAvailable, setGpuAvailable] = useState<boolean | null>(null);
   const [showPresets, setShowPresets] = useState(false);
+  const [showExperiments, setShowExperiments] = useState(false);
   const [recentExperiments, setRecentExperiments] = useState<{id: string; date: string; accuracy: string; model: string}[]>([]);
   
   const [isRunning, setIsRunning] = useState(false);
@@ -99,7 +100,6 @@ export default function Home() {
     }
     checkGpu();
   }, []);
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -109,12 +109,13 @@ export default function Home() {
         } else if (e.key === 'p') {
           e.preventDefault();
           setShowPresets(!showPresets);
+          setShowExperiments(false);
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isRunning, datasetPath, showPresets]);
+  }, [isRunning, datasetPath, showPresets, showExperiments]);
 
   const applyPreset = (preset: Preset) => {
     setEpochs(preset.epochs);
@@ -209,6 +210,8 @@ export default function Home() {
     setEvalResult(null);
     setProgress(0);
     setActiveTab('logs');
+    setShowPresets(false);
+    setShowExperiments(false);
     
     try {
       let scriptPath: string;
@@ -323,9 +326,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen font-sans bg-black text-zinc-100 p-8">
+    <div className="min-h-screen font-sans bg-black text-zinc-100">
       {/* Header */}
-      <header className="mb-12 flex items-center justify-between">
+      <header className="sticky top-0 z-50 flex items-center justify-between bg-black/80 backdrop-blur-md border-b border-zinc-800/50 px-8 py-4 mb-8">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-zinc-900 rounded-full border border-zinc-800 overflow-hidden shrink-0">
              <img src="/epoq2.png" alt="EPOQ Logo" className="w-full h-full object-cover" />
@@ -346,11 +349,49 @@ export default function Home() {
               {gpuAvailable === null ? 'Checking...' : gpuAvailable ? 'GPU Available' : 'CPU Only'}
             </span>
           </div>
+          {/* Recent Experiments Button */}
+          <div className="relative">
+            <button 
+              onClick={() => {
+                setShowExperiments(!showExperiments);
+                setShowPresets(false);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-full text-sm text-zinc-300 transition-colors"
+            >
+              <Activity className="w-4 h-4" /> Recent
+            </button>
+            {showExperiments && (
+              <div className="absolute right-0 mt-2 w-72 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden">
+                {recentExperiments.length > 0 ? (
+                  <div className="max-h-64 overflow-y-auto">
+                    {recentExperiments.map((exp) => (
+                      <div key={exp.id} className="p-3 border-b last:border-b-0 border-zinc-800/50 hover:bg-zinc-800 transition-colors">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="text-sm text-zinc-300 font-medium">{exp.model}</div>
+                            <div className="text-xs text-zinc-500">{exp.date}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-mono text-emerald-400">{exp.accuracy !== 'N/A' ? `${(parseFloat(exp.accuracy)*100).toFixed(2)}%` : exp.accuracy}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-sm text-zinc-500">No recent experiments</div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Presets Button */}
           <div className="relative">
             <button 
-              onClick={() => setShowPresets(!showPresets)}
+              onClick={() => {
+                setShowPresets(!showPresets);
+                setShowExperiments(false);
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-full text-sm text-zinc-300 transition-colors"
             >
               <Layers className="w-4 h-4" /> Presets
@@ -396,7 +437,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-8 pb-8">
         {/* Left Panel: Configuration */}
         <section className="lg:col-span-4 space-y-8">
           <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6 backdrop-blur-sm">
@@ -563,29 +604,6 @@ export default function Home() {
                 </label>
               </div>
             </div>
-
-            {/* Recent Experiments */}
-            {recentExperiments.length > 0 && (
-              <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6 backdrop-blur-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <Activity className="w-5 h-5 text-zinc-400" />
-                  <h2 className="text-lg font-semibold tracking-tight">Recent Experiments</h2>
-                </div>
-                <div className="space-y-2">
-                  {recentExperiments.map((exp) => (
-                    <div key={exp.id} className="flex justify-between items-center p-3 bg-black/30 rounded-lg border border-zinc-800/50">
-                      <div>
-                        <div className="text-sm text-zinc-300 font-medium">{exp.model}</div>
-                        <div className="text-xs text-zinc-500">{exp.date}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-mono text-emerald-400">{exp.accuracy !== 'N/A' ? `${(parseFloat(exp.accuracy)*100).toFixed(2)}%` : exp.accuracy}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
