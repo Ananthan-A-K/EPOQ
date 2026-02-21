@@ -68,7 +68,7 @@ export default function Home() {
   const [scanningEnvs, setScanningEnvs] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [showExperiments, setShowExperiments] = useState(false);
-  const [isLightMode, setIsLightMode] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(true);
   const [recentExperiments, setRecentExperiments] = useState<{id: string; date: string; accuracy: string; model: string}[]>([]);
   const finalAccuracyRef = useRef<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
