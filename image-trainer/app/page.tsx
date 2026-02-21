@@ -63,6 +63,9 @@ export default function Home() {
   const [zipDataset, setZipDataset] = useState(false);
   const [onlyZip, setOnlyZip] = useState(false);
   const [gpuAvailable, setGpuAvailable] = useState<boolean | null>(null);
+  const [condaEnvs, setCondaEnvs] = useState<{name: string, isGpu: boolean | null}[]>([]);
+  const [selectedEnv, setSelectedEnv] = useState<string>('system');
+  const [scanningEnvs, setScanningEnvs] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
   const [showExperiments, setShowExperiments] = useState(false);
   const [recentExperiments, setRecentExperiments] = useState<{id: string; date: string; accuracy: string; model: string}[]>([]);
@@ -82,24 +85,74 @@ export default function Home() {
   const commandRef = useRef<Command<string> | null>(null);
   const childRef = useRef<any>(null);
 
-  // Check GPU availability on mount
+  // Check GPU availability
   useEffect(() => {
     async function checkGpu() {
+      setGpuAvailable(null);
       try {
-        const cmd = Command.create('python', ['-c', 'import torch; print(torch.cuda.is_available())']);
-        cmd.stdout.on('data', (data) => {
-          setGpuAvailable(data.trim() === 'True');
-        });
-        cmd.stderr.on('data', () => {
-          setGpuAvailable(false);
-        });
-        await cmd.spawn();
+        let cmdName = 'python';
+        let args = ['-c', 'import torch; print(torch.cuda.is_available())'];
+        
+        if (selectedEnv.startsWith('conda:')) {
+           const envName = selectedEnv.replace('conda:', '');
+           cmdName = 'conda';
+           args = ['run', '-n', envName, 'python', '-c', 'import torch; print(torch.cuda.is_available())'];
+        }
+        
+        const cmd = Command.create(cmdName, args);
+        const res = await cmd.execute();
+        setGpuAvailable(res.code === 0 && res.stdout.trim() === 'True');
       } catch {
         setGpuAvailable(false);
       }
     }
     checkGpu();
-  }, []);
+  }, [selectedEnv]);
+
+  const scanCondaEnvs = async () => {
+    setScanningEnvs(true);
+    addLog('Scanning Conda environments...', 'info');
+    try {
+      const cmd = Command.create('conda', ['env', 'list', '--json']);
+      const output = await cmd.execute();
+      if (output.code === 0) {
+        const data = JSON.parse(output.stdout);
+        const envs = data.envs as string[];
+        const detected = [];
+        for (const envPath of envs) {
+           const name = envPath === envs[0] ? 'base' : envPath.split(/[\\/]/).pop() || 'unknown';
+           detected.push({ name, isGpu: null });
+        }
+        setCondaEnvs(detected);
+        addLog(`Found ${detected.length} Conda environments. Testing for PyTorch GPU...`, 'info');
+        
+        const tested = [];
+        for (const env of detected) {
+           try {
+             const testCmd = Command.create('conda', ['run', '-n', env.name, 'python', '-c', 'import torch; print(torch.cuda.is_available())']);
+             const res = await testCmd.execute();
+             const isGpu = res.stdout.trim() === 'True';
+             tested.push({ ...env, isGpu });
+             addLog(`Env '${env.name}' - PyTorch GPU: ${isGpu}`, isGpu ? 'success' : 'info');
+           } catch {
+             tested.push({ ...env, isGpu: false });
+           }
+        }
+        setCondaEnvs(tested);
+        
+        const gpuEnv = tested.find(e => e.isGpu);
+        if (gpuEnv && !gpuAvailable) {
+          setSelectedEnv(`conda:${gpuEnv.name}`);
+          addLog(`Auto-selected GPU environment: ${gpuEnv.name}`, 'success');
+        }
+      } else {
+         addLog('Conda not found or failed to list envs.', 'error');
+      }
+    } catch (e) {
+       addLog(`Failed to scan Conda envs: ${e}`, 'error');
+    }
+    setScanningEnvs(false);
+  };
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -245,9 +298,17 @@ export default function Home() {
       if (zipDataset) args.push('--zip_dataset');
       if (onlyZip) args.push('--only_zip');
 
-      addLog(`Starting command: python ${args.join(' ')}`, 'info');
+      let finalCmd = 'python';
+      let finalArgs = args;
+      if (selectedEnv.startsWith('conda:')) {
+         const envName = selectedEnv.replace('conda:', '');
+         finalCmd = 'conda';
+         finalArgs = ['run', '-n', envName, '--no-capture-output', 'python', ...args];
+      }
 
-      const cmd = Command.create('python', args);
+      addLog(`Starting command: ${finalCmd} ${finalArgs.join(' ')}`, 'info');
+
+      const cmd = Command.create(finalCmd, finalArgs);
       commandRef.current = cmd;
 
       cmd.on('close', (data) => {
@@ -447,6 +508,37 @@ export default function Home() {
             </div>
 
             <div className="space-y-6">
+              {/* Environment Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                   <label className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">Python Environment</label>
+                   <button 
+                     onClick={scanCondaEnvs}
+                     disabled={scanningEnvs}
+                     className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-50"
+                   >
+                     {scanningEnvs ? 'Scanning...' : 'Detect Conda GPU Env'}
+                   </button>
+                </div>
+                <div className="relative">
+                  <select 
+                    value={selectedEnv}
+                    onChange={(e) => setSelectedEnv(e.target.value)}
+                    className="w-full appearance-none bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 focus:border-zinc-600 focus:outline-none transition-colors"
+                  >
+                    <option value="system">System Default (python)</option>
+                    {condaEnvs.map((env) => (
+                      <option key={env.name} value={`conda:${env.name}`}>
+                        Conda: {env.name} {env.isGpu ? '(GPU Available)' : '(CPU Only)'}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </div>
+              </div>
+
               {/* Dataset Path */}
               <div className="space-y-2">
                 <label className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">Dataset Location</label>
