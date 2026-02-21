@@ -15,6 +15,7 @@ type DependencyStatus = {
 export default function DependencyWizard({ onComplete }: { onComplete: () => void }) {
   const [checking, setChecking] = useState(true);
   const [status, setStatus] = useState<DependencyStatus | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     console.log("DependencyWizard mounted, starting checkDeps()");
@@ -49,17 +50,35 @@ export default function DependencyWizard({ onComplete }: { onComplete: () => voi
         }
     }
     
-    // Slight delay so the UI doesn't just flash on very fast machines
-    const timer = setTimeout(() => {
+    // Show splash screen for 2.5 seconds, then perform dependency checks
+    const splashTimer = setTimeout(() => {
+        setShowSplash(false);
         checkDeps();
-    }, 500);
-    return () => clearTimeout(timer);
+    }, 2500);
+    
+    return () => clearTimeout(splashTimer);
   }, [onComplete]);
+
+  if (showSplash) {
+    return (
+      <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black">
+        <div className="flex flex-col items-center justify-center gap-8 animate-pulse transition-opacity duration-1000">
+          <div className="w-32 h-32 md:w-48 md:h-48 rounded-full overflow-hidden border border-zinc-800 shadow-[0_0_80px_rgba(255,255,255,0.05)] bg-zinc-900 flex items-center justify-center">
+            <img src="/epoq2.png" alt="EPOQ Logo" className="w-[85%] h-[85%] object-cover rounded-full" />
+          </div>
+          <div className="flex flex-col items-center">
+            <h1 className="text-4xl md:text-6xl font-black tracking-[0.2em] text-white">EPOQ</h1>
+            <p className="text-zinc-500 tracking-[0.3em] uppercase text-xs mt-3">Image Trainer</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!status && checking) {
     console.log("Rendering INIT state");
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-md">
         <div className="flex flex-col items-center gap-4 text-center p-8">
             <span className="inline-block w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
             <h2 className="text-xl font-semibold text-white">Initializing EPOQ</h2>
