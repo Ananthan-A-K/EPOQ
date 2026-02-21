@@ -103,8 +103,6 @@ export default function Home() {
   const [tabOutPath, setTabOutPath] = useState('');
   const [tabLoading, setTabLoading] = useState(false);
   const [tabResult, setTabResult] = useState<TabularResult | null>(null);
-  const [gpuModalOutput, setGpuModalOutput] = useState<string | null>(null);
-  const [gpuChecking, setGpuChecking] = useState(false);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const commandRef = useRef<Command<string> | null>(null);
@@ -133,18 +131,6 @@ export default function Home() {
     }
     checkGpu();
   }, [selectedEnv]);
-
-  const handleCheckGpu = useCallback(async () => {
-    setGpuChecking(true);
-    try {
-      const output: string = await invoke('run_check_gpu');
-      setGpuModalOutput(output);
-    } catch (err) {
-      setGpuModalOutput(`Error: ${String(err)}`);
-    } finally {
-      setGpuChecking(false);
-    }
-  }, []);
 
   const pickTabFile = useCallback(async () => {
     const selected = await open({ multiple: false, filters: [{ name: 'Data Files', extensions: ['csv', 'xlsx', 'xls'] }] });
@@ -479,13 +465,6 @@ export default function Home() {
               {gpuAvailable === null ? 'Checking...' : gpuAvailable ? 'GPU Available' : 'CPU Only'}
             </span>
           </div>
-          {/* Check GPU Detail Button */}
-          <button id="gpu-check-btn" onClick={handleCheckGpu} disabled={gpuChecking}
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-full text-sm text-zinc-300 transition-colors disabled:opacity-50"
-          >
-            {gpuChecking ? <span className="inline-block w-3.5 h-3.5 border-2 border-zinc-400/30 border-t-zinc-400 rounded-full animate-spin" /> : <Database className="w-4 h-4" />}
-            Check GPU
-          </button>
           {/* Recent Experiments Button */}
           <div className="relative">
             <button 
@@ -1031,12 +1010,12 @@ export default function Home() {
                    <div className="p-6 overflow-y-auto space-y-4">
                      <div>
                        <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-widest mb-2">Tabular Data Processor</h3>
-                       <p className="text-xs text-zinc-600 mb-4">Load or transform CSV / Excel files via <code className="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-300">tabular_processor.py</code></p>
+                       <p className="text-xs text-zinc-500 mb-4">Load or transform CSV / Excel files via <code className="bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-300">tabular_processor.py</code></p>
                      </div>
                      <div className="flex gap-2">
                        <input id="data-file-path" type="text" value={tabFile} onChange={e => setTabFile(e.target.value)}
                          placeholder="Select CSV / Excel file…"
-                         className="flex-1 bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none font-mono"
+                         className="flex-1 bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none font-mono"
                        />
                        <button id="data-pick-file" onClick={pickTabFile}
                          className="p-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors"
@@ -1044,7 +1023,7 @@ export default function Home() {
                      </div>
                      <div className="relative">
                        <select id="data-action" value={tabAction} onChange={e => setTabAction(e.target.value as TabAction)}
-                         className="w-full appearance-none bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 focus:border-zinc-600 focus:outline-none"
+                         className="w-full appearance-none bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 focus:border-zinc-500 focus:outline-none"
                        >
                          <option value="load">Load &amp; Preview</option>
                          <option value="drop_missing">Drop Missing Rows</option>
@@ -1057,7 +1036,7 @@ export default function Home() {
                      {tabAction === 'fill_missing' && (
                        <div className="relative">
                          <select id="data-fill-method" value={fillMethod} onChange={e => setFillMethod(e.target.value as FillMethod)}
-                           className="w-full appearance-none bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 focus:border-zinc-600 focus:outline-none"
+                           className="w-full appearance-none bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 focus:border-zinc-500 focus:outline-none"
                          >
                            <option value="mean">Mean</option>
                            <option value="median">Median</option>
@@ -1070,36 +1049,36 @@ export default function Home() {
                      {(tabAction === 'label_encode' || tabAction === 'one_hot_encode') && (
                        <input id="data-encode-columns" type="text" value={encodeColumns} onChange={e => setEncodeColumns(e.target.value)}
                          placeholder="Columns to encode (comma-separated)"
-                         className="w-full bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
+                         className="w-full bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
                        />
                      )}
                      {tabAction !== 'load' && (
                        <input id="data-out-path" type="text" value={tabOutPath} onChange={e => setTabOutPath(e.target.value)}
                          placeholder="Save output to… (optional)"
-                         className="w-full bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none font-mono"
+                         className="w-full bg-black border border-zinc-800 rounded-lg py-2.5 px-3 text-sm text-zinc-300 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none font-mono"
                        />
                      )}
                      <button id="data-run-btn" onClick={runTabular} disabled={!tabFile || tabLoading}
-                       className="flex items-center justify-center gap-2 w-full py-2.5 bg-white text-black hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition-all"
+                       className="flex items-center justify-center gap-2 w-full py-2.5 bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition-all"
                      >
-                       {tabLoading ? <><span className="inline-block w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" /> Processing…</> : 'Run'}
+                       {tabLoading ? <><span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> Processing…</> : 'Run'}
                      </button>
                      {tabResult && (
                        <div>
                          {tabResult.status === 'error' ? (
-                           <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-red-400 text-xs"><strong>Error:</strong> {tabResult.message}</div>
+                           <div className="rounded-xl border border-red-900/30 bg-red-900/20 p-3 text-red-400 text-xs"><strong>Error:</strong> {tabResult.message}</div>
                          ) : (
                            <div className="space-y-3">
                              <div className="flex flex-wrap gap-2 text-xs">
-                               {tabResult.shape && <span className="rounded-full bg-blue-500/10 border border-blue-500/30 px-3 py-1 text-blue-300">Shape: {tabResult.shape[0]} × {tabResult.shape[1]}</span>}
-                               {tabResult.message && <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-emerald-300">{tabResult.message}</span>}
+                               {tabResult.shape && <span className="rounded-full bg-blue-500/10 border border-blue-500/30 px-3 py-1 text-blue-400">Shape: {tabResult.shape[0]} × {tabResult.shape[1]}</span>}
+                               {tabResult.message && <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-emerald-400">{tabResult.message}</span>}
                              </div>
                              {tabResult.columns && tabResult.data && (
                                <div className="overflow-x-auto rounded-xl border border-zinc-800">
                                  <table className="min-w-full text-xs">
-                                   <thead className="bg-zinc-800/80"><tr>
+                                   <thead className="bg-zinc-900"><tr>
                                      {tabResult.columns.map(col => (
-                                       <th key={col} className="px-3 py-2 text-left font-semibold text-zinc-300 whitespace-nowrap border-b border-zinc-700">
+                                       <th key={col} className="px-3 py-2 text-left font-semibold text-zinc-300 whitespace-nowrap border-b border-zinc-800">
                                          <div>{col}</div>
                                          {tabResult.dtypes && <div className="font-normal text-zinc-500">{tabResult.dtypes[col]}</div>}
                                        </th>
@@ -1107,9 +1086,9 @@ export default function Home() {
                                    </tr></thead>
                                    <tbody className="divide-y divide-zinc-800">
                                      {tabResult.data.map((row, ri) => (
-                                       <tr key={ri} className="hover:bg-zinc-800/40 transition-colors">
+                                       <tr key={ri} className="hover:bg-zinc-900/50 transition-colors">
                                          {row.map((cell, ci) => (
-                                           <td key={ci} className={`px-3 py-2 whitespace-nowrap ${cell === null ? 'text-zinc-600 italic' : 'text-zinc-200'}`}>
+                                           <td key={ci} className={`px-3 py-2 whitespace-nowrap ${cell === null ? 'text-zinc-500 italic' : 'text-zinc-100'}`}>
                                              {cell === null ? 'null' : String(cell)}
                                            </td>
                                          ))}
@@ -1130,20 +1109,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* GPU Detail Modal */}
-      {gpuModalOutput !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setGpuModalOutput(null)}>
-          <div className="relative w-full max-w-lg rounded-2xl bg-zinc-900 border border-zinc-700 p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2"><Database className="w-5 h-5 text-emerald-400" /> GPU / Environment Info</h2>
-              <button onClick={() => setGpuModalOutput(null)} className="text-zinc-400 hover:text-white transition-colors text-xl leading-none">✕</button>
-            </div>
-            <pre className="whitespace-pre-wrap font-mono text-sm text-emerald-300 bg-black/40 rounded-lg p-4 max-h-72 overflow-y-auto">
-              {gpuModalOutput || 'No output received.'}
-            </pre>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
