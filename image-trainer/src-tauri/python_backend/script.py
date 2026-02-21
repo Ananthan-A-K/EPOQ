@@ -23,11 +23,12 @@ def main():
     parser.add_argument('--path', type=str, required=True, help='Path to dataset')
     parser.add_argument('--epochs', type=int, default=5, help='Number of epochs')
     parser.add_argument('--save_path', type=str, required=False, help='Path to save models')
-    parser.add_argument('--model', type=str, default='resnet18', choices=['resnet18', 'dcn', 'eva02'], help='Model type: resnet18, dcn, or eva02')
+    parser.add_argument('--model', type=str, default='resnet18', choices=['resnet18', 'resnet50', 'efficientnet_b0', 'dcn', 'eva02'], help='Model type: resnet18, resnet50, efficientnet_b0, dcn, or eva02')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate for optimizer')
     parser.add_argument('--zip_dataset', action='store_true', help='Create a zip archive of the dataset')
     parser.add_argument('--only_zip', action='store_true', help='Exit after creating dataset zip')
-    parser.add_argument('--experiment_id', type=str, required=False, help='Experiment ID for tracking')
+    parser.add_argument('--experiment_id', type=str, default=None, help='Experiment ID from the frontend')
     args = parser.parse_args()
     
     data_dir = args.path
@@ -230,7 +231,7 @@ def main():
 
     try:
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(parameters_to_optimize, lr=0.001, momentum=0.9)
+        optimizer = optim.SGD(parameters_to_optimize, lr=args.learning_rate, momentum=0.9)
         
         num_epochs = args.epochs 
         best_acc = 0.0 
