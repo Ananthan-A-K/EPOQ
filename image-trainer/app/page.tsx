@@ -54,6 +54,18 @@ interface EvalResult {
   total_epochs: number;
   test_size: number;
 }
+interface StoredExperiment {
+  id: string;
+  date: string;
+  accuracy: string;
+  model: string;
+  training_metrics: {
+    epoch: number;
+    accuracy: number;
+    loss: number;
+  }[];
+}
+
 
 type TabularResult = {
   status: 'success' | 'error';
@@ -87,7 +99,7 @@ export default function Home() {
   const [showPresets, setShowPresets] = useState(false);
   const [showExperiments, setShowExperiments] = useState(false);
   const [isLightMode, setIsLightMode] = useState(true);
-  const [recentExperiments, setRecentExperiments] = useState<{id: string; date: string; accuracy: string; model: string}[]>([]);
+  const [recentExperiments, setRecentExperiments] = useState<StoredExperiment[]>([]);
   const finalAccuracyRef = useRef<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [pid, setPid] = useState<number | null>(null);
@@ -98,7 +110,7 @@ export default function Home() {
   const [evalResult, setEvalResult] = useState<EvalResult | null>(null);
   const [matrixImageUrl, setMatrixImageUrl] = useState<string | null>(null);
   const [imageLoadError, setImageLoadError] = useState(false);
-  const [activeTab, setActiveTab] = useState<'logs' | 'charts' | 'results' | 'data' | 'system'>('logs');
+  const [activeTab, setActiveTab] = useState<'logs' | 'charts' | 'results' | 'data' | 'system' | 'compare'>('logs');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   // Tabular / GPU state
   const [tabFile, setTabFile] = useState('');
@@ -115,6 +127,7 @@ export default function Home() {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const commandRef = useRef<Command<string> | null>(null);
   const childRef = useRef<any>(null);
+  const metricsRef = useRef<any[]>([]);
   // Check GPU availability
   useEffect(() => {
     async function checkGpu() {
@@ -381,6 +394,7 @@ useEffect(() => {
   setIsRunning(true);
   setLogs([]);
   setChartData([]);
+  metricsRef.current = [];
   setEvalResult(null);
   setProgress(0);
   setActiveTab('logs');
@@ -444,9 +458,15 @@ useEffect(() => {
             // Save to recent experiments
             // const expId = `exp_${Date.now()}`;
             setRecentExperiments(prev => [
-              { id: experimentId, date: new Date().toLocaleDateString(), accuracy: finalAccuracyRef.current || 'N/A', model },
-              ...prev.slice(0, 4)
-            ]);
+          {
+            id: experimentId,
+            date: new Date().toLocaleDateString(),
+            accuracy: finalAccuracyRef.current || 'N/A',
+            model,
+            training_metrics: metricsRef.current  
+          },
+          ...prev.slice(0, 9)
+        ]);
         }
       });
 
@@ -459,16 +479,18 @@ useEffect(() => {
         try {
           const data = JSON.parse(line);
           
+          
           if (data.status === 'training') {
-          setCurrentStatus(data);
-          setChartData(prev => [
-            ...prev,
-            {
-              epoch: data.epoch,
-              accuracy: parseFloat(data.accuracy),
-              loss: parseFloat(data.loss),
-            }
-          ]);
+  setCurrentStatus(data);
+
+  const newPoint = {
+    epoch: data.epoch,
+    accuracy: parseFloat(data.accuracy),
+    loss: parseFloat(data.loss),
+  };
+
+  metricsRef.current.push(newPoint);
+  setChartData([...metricsRef.current]);
           finalAccuracyRef.current = data.accuracy;
             const prog = (data.epoch / data.total_epochs) * 100;
             setProgress(prog);
@@ -595,6 +617,30 @@ const getUsageColor = (value: number) => {
   if (value < 80) return "bg-yellow-500"
   return "bg-red-500"
 }
+const [compareA, setCompareA] = useState<StoredExperiment | null>(null);
+const [compareB, setCompareB] = useState<StoredExperiment | null>(null);
+const [compareData, setCompareData] = useState<any[]>([]);
+useEffect(() => {
+  console.log("Compare A:", compareA);
+console.log("Compare B:", compareB);
+  if (!compareA || !compareB) {
+    setCompareData([]);
+    return;
+  }
+
+  const maxEpochs = Math.max(
+    compareA.training_metrics.length,
+    compareB.training_metrics.length
+  );
+
+  const merged = Array.from({ length: maxEpochs }).map((_, i) => ({
+    epoch: i + 1,
+    A: compareA.training_metrics[i]?.accuracy ?? null,
+    B: compareB.training_metrics[i]?.accuracy ?? null,
+  }));
+
+  setCompareData(merged);
+}, [compareA, compareB]);
   return (
     <>
       {!depsChecked && <DependencyWizard onComplete={() => setDepsChecked(true)} />}
@@ -1051,6 +1097,17 @@ const getUsageColor = (value: number) => {
               >
                 <Cpu className="w-4 h-4" /> System
               </button>
+              <button
+              onClick={() => setActiveTab('compare')}
+              className={cn(
+                "px-6 py-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2",
+                activeTab === 'compare'
+                  ? "border-white text-white"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              )}
+            >
+              <BarChart2 className="w-4 h-4" /> Compare
+            </button>
               </div>
 
               <div className="flex-1 overflow-y-auto bg-black/50 scrollbar-thin">
@@ -1345,6 +1402,7 @@ const getUsageColor = (value: number) => {
         <span className="inline-block w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
       </div>
     )}
+    
 
     {systemError && (
       <div className="p-6 bg-red-900/10 border border-red-900/30 rounded-xl text-red-400">
@@ -1354,6 +1412,7 @@ const getUsageColor = (value: number) => {
         <p className="text-sm opacity-80">{systemError}</p>
       </div>
     )}
+    
 
     {systemInfo && (
       <div className="space-y-8">
@@ -1551,8 +1610,73 @@ const getUsageColor = (value: number) => {
       </div>
       </div>
     )}
+    
   </div>
 )}
+{activeTab === 'compare' && (
+  <div className="p-8 space-y-6">
+    {recentExperiments.length < 2 ? (
+      <div className="text-center text-zinc-500 mt-20">
+        Run at least 2 experiments to compare.
+      </div>
+    ) : (
+      <>
+        {/* SELECTORS */}
+        <div className="grid grid-cols-2 gap-6">
+          <select
+            onChange={(e) =>
+              setCompareA(
+                recentExperiments.find(exp => exp.id === e.target.value) || null
+              )
+            }
+            className="bg-black border border-zinc-800 rounded-lg p-2 text-sm"
+          >
+            <option value="">Select Experiment A</option>
+            {recentExperiments.map(exp => (
+              <option key={exp.id} value={exp.id}>
+                {exp.model} - {exp.date}
+              </option>
+            ))}
+          </select>
+
+          <select
+            onChange={(e) =>
+              setCompareB(
+                recentExperiments.find(exp => exp.id === e.target.value) || null
+              )
+            }
+            className="bg-black border border-zinc-800 rounded-lg p-2 text-sm"
+          >
+            <option value="">Select Experiment B</option>
+            {recentExperiments.map(exp => (
+              <option key={exp.id} value={exp.id}>
+                {exp.model} - {exp.date}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* GRAPH */}
+        {compareData.length > 0 && (
+          <div className="h-[350px] w-full mt-6">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={compareData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="epoch" />
+                <YAxis domain={[0, 1]} />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="A" stroke="#22c55e" strokeWidth={2} />
+                <Line type="monotone" dataKey="B" stroke="#3b82f6" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+)}
+
               </div>
            </div>
         </section>
